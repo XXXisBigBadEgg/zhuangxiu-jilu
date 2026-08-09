@@ -321,9 +321,13 @@
           node.done = !node.done;
           saveWorkflow(); render();
         } else if (btn.dataset.wf === 'del') {
-          if (!confirm('删除这个流程吗？它下面的衔接流程会保留并顶上来。')) return;
-          removeWorkNode(wf[cid], item.dataset.id);
-          saveWorkflow(); render();
+          confirmDialog('删除这个流程吗？它下面的衔接流程会保留并顶上来。', {
+            title: '删除流程', icon: ICONS.trash
+          }).then(function (ok) {
+            if (!ok) return;
+            removeWorkNode(wf[cid], item.dataset.id);
+            saveWorkflow(); render();
+          });
         } else if (btn.dataset.wf === 'link') {
           var wrap = item.querySelector('.wf-inline');
           if (wrap) wrap.classList.toggle('hidden');
@@ -545,13 +549,17 @@
   }
 
   function delRecord(id) {
-    if (!confirm('确定删除这条记录吗？')) return;
-    RECORD_CATS.forEach(function (c) {
-      data[c.id] = (data[c.id] || []).filter(function (x) { return x.id !== id; });
+    confirmDialog('确定删除这条记录吗？', {
+      title: '删除记录', icon: ICONS.trash
+    }).then(function (ok) {
+      if (!ok) return;
+      RECORD_CATS.forEach(function (c) {
+        data[c.id] = (data[c.id] || []).filter(function (x) { return x.id !== id; });
+      });
+      save();
+      render();
+      toast('已删除');
     });
-    save();
-    render();
-    toast('已删除');
   }
 
   /* ---------- Toast ---------- */
@@ -562,6 +570,42 @@
     t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
+  }
+
+  /* ---------- 统一鹅黄确认弹窗（替换原生 confirm） ---------- */
+  function confirmDialog(message, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      var m = document.createElement('div');
+      m.className = 'cf-modal';
+      m.innerHTML =
+        '<div class="cf-box">' +
+          '<div class="cf-head">' +
+            '<span class="cf-title">' + (opts.title || '提示') + '</span>' +
+            (opts.icon ? '<span class="cf-ic">' + opts.icon + '</span>' : '') +
+          '</div>' +
+          '<div class="cf-msg">' + esc(message) + '</div>' +
+          '<div class="cf-actions">' +
+            '<button class="btn" data-cf="no">' + (opts.cancelText || '取消') + '</button>' +
+            '<button class="btn btn-primary" data-cf="yes">' + (opts.okText || '确定') + '</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(m);
+      m.addEventListener('click', function (e) {
+        if (e.target === m) { close(false); return; }
+        var b = e.target.closest('[data-cf]');
+        if (b) close(b.dataset.cf === 'yes');
+      });
+      document.addEventListener('keydown', onKey);
+      function onKey(e) { if (e.key === 'Escape') close(false); }
+      function close(v) {
+        document.removeEventListener('keydown', onKey);
+        m.classList.remove('open');
+        setTimeout(function () { m.remove(); }, 180);
+        resolve(v);
+      }
+      requestAnimationFrame(function () { m.classList.add('open'); });
+    });
   }
 
   /* ---------- 全局事件 ---------- */
@@ -584,7 +628,8 @@
     refresh: render,
     toast: toast,
     esc: esc,
-    fmt: fmt
+    fmt: fmt,
+    confirm: confirmDialog
   };
 
   /* ---------- 启动 ---------- */

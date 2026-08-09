@@ -236,10 +236,14 @@
     save(); App.refresh();
   }
   function delItem(id, isBp) {
-    if (!confirm('确定删除这项内容吗？')) return;
-    if (isBp) data.blueprints = data.blueprints.filter(function (b) { return b.id !== id; });
-    else data.wall = data.wall.filter(function (it) { return it.id !== id; });
-    save(); App.refresh();
+    App.confirm('确定删除这项内容吗？', {
+      title: '删除内容', icon: IC.trash
+    }).then(function (ok) {
+      if (!ok) return;
+      if (isBp) data.blueprints = data.blueprints.filter(function (b) { return b.id !== id; });
+      else data.wall = data.wall.filter(function (it) { return it.id !== id; });
+      save(); App.refresh();
+    });
   }
 
   /* ================= 点子：文字 + 可选配图 ================= */
@@ -352,11 +356,15 @@
     });
     $('#ideaDel').addEventListener('click', function () {
       if (!ideaCurrent) return;
-      if (!confirm('删除这条点子吗？')) return;
-      data.wall = data.wall.filter(function (x) { return x.id !== ideaCurrent.id; });
-      save(); App.refresh();
-      closeIdea();
-      toast('已删除');
+      App.confirm('删除这条点子吗？', {
+        title: '删除点子', icon: IC.trash
+      }).then(function (ok) {
+        if (!ok) return;
+        data.wall = data.wall.filter(function (x) { return x.id !== ideaCurrent.id; });
+        save(); App.refresh();
+        closeIdea();
+        toast('已删除');
+      });
     });
     $('#ideaImg').addEventListener('click', function () {
       if (!ideaCurrent || !ideaCurrent.full) return;
@@ -848,8 +856,12 @@
   }
   function clearMarks() {
     if (!viewer || !viewer.marks.length) return;
-    if (!confirm('清空全部标记？')) return;
-    viewer.marks = []; viewer.dirty = true; renderMarks();
+    App.confirm('清空全部标记？', {
+      title: '清空标记', icon: IC.x
+    }).then(function (ok) {
+      if (!ok) return;
+      viewer.marks = []; viewer.dirty = true; renderMarks();
+    });
   }
   function bake() {
     var cv = document.createElement('canvas');

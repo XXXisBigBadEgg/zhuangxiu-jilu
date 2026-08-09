@@ -281,14 +281,38 @@ body.sidebar-open #backdrop { opacity: 1; pointer-events: auto; }
 #toast {
   position: fixed; left: 50%; bottom: 40px;
   transform: translateX(-50%) translateY(20px);
-  background: rgba(61, 53, 42, .92); color: #fff;
+  background: var(--yellow); color: var(--ink);
   padding: 10px 20px; border-radius: 999px; font-size: 14px;
+  font-weight: 600; box-shadow: var(--shadow-sm);
   opacity: 0; pointer-events: none;
   transition: .25s; z-index: 100;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ============ 统一确认弹窗（鹅黄主题 + 圆角按钮） ============ */
+.cf-modal {
+  position: fixed; inset: 0; z-index: 250;
+  background: rgba(22, 18, 10, .45);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.cf-modal.open { display: flex; }
+.cf-box {
+  width: 100%; max-width: 320px;
+  background: var(--cream); border-radius: 16px; padding: 18px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: var(--shadow); animation: fade .18s ease;
+}
+.cf-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cf-title { font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.cf-title svg { width: 18px; height: 18px; color: var(--yellow-deep); }
+.cf-ic { color: var(--yellow-deep); display: inline-flex; }
+.cf-ic svg { width: 18px; height: 18px; }
+.cf-msg { font-size: 14px; line-height: 1.7; color: var(--ink); word-break: break-word; }
+.cf-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 2px; }
+.cf-actions .btn { min-width: 76px; padding: 9px 14px; border-radius: 10px; }
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
