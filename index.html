@@ -9,6 +9,15 @@
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>装修记录 · 家的每一步</title>
+  <!-- PWA：添加到主屏幕 / 独立全屏运行 / 离线可用 -->
+  <meta name="theme-color" content="#F5C542">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="装修记录">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -90,5 +99,11 @@
 
   <script src="app.js"></script>
   <script src="design.js"></script>
+  <script>
+    /* 注册 Service Worker：提供离线缓存（本地 file:// 打开时浏览器会拒绝，静默忽略） */
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    }
+  </script>
 </body>
 </html>
