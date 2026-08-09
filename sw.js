@@ -1,5 +1,5 @@
 /* 装修记录 · Service Worker：离线缓存，支持添加到主屏幕后离线使用 */
-const CACHE = 'zhuangxiu-v2';
+const CACHE = 'zhuangxiu-v3';
 const ASSETS = [
   './',
   './index.html',

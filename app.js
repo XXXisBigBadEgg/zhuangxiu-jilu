@@ -17,7 +17,8 @@
     { id: 'misc',       name: '零散花销', icon: 'misc' },
     { id: 'bill',       name: '账单',     icon: 'bill' }
   ];
-  var RECORD_CATS = CATEGORIES.filter(function (c) { return c.id !== 'bill'; });
+  /* 记账类目 = 除 设计/账单 外的 8 个方向（设计不再记账，其余方向改为工作台但历史账目仍在账单展示） */
+  var RECORD_CATS = CATEGORIES.filter(function (c) { return c.id !== 'bill' && c.id !== 'design'; });
 
   /* ---------- 矢量图标库（统一描边风格，随容器 currentColor） ---------- */
   function svgI(path) {
@@ -45,7 +46,7 @@
   };
   window.RENO_ICONS = ICONS;
 
-  var state = { current: 'bill', editingId: null };
+  var state = { current: 'bill', editingId: null, editingCat: null };
 
   /* 数据：data[分类id] = [{ id, date, name, amount, note, createdAt }] */
   var data = load();
@@ -66,6 +67,60 @@
   }
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) { /* 隐私模式下可能失败 */ }
+  }
+
+  /* 类目类型：账单 = 记账中心 / 设计 = 图纸+灵感墙 / 其他 = 工作台 */
+  function catType(cid) {
+    if (cid === 'bill') return 'bill';
+    if (cid === 'design') return 'design';
+    return 'work';
+  }
+  function uid() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function grandTotal() {
+    return allRecords().reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
+  }
+
+  /* ---------- 工作台存储（流程树，sub 递归嵌套） ---------- */
+  var WF_KEY = 'zhuangxiu-workflow-v1';
+  var wf = loadWorkflow();
+  function loadWorkflow() {
+    try {
+      var d = JSON.parse(localStorage.getItem(WF_KEY));
+      if (d && typeof d === 'object') return d;
+    } catch (e) {}
+    return {};
+  }
+  function saveWorkflow() {
+    try { localStorage.setItem(WF_KEY, JSON.stringify(wf)); } catch (e) { toast('存储失败'); }
+  }
+  function countWork(list) {
+    var done = 0, total = 0;
+    (list || []).forEach(function (it) {
+      total += 1;
+      if (it.done) done += 1;
+      var s = countWork(it.sub);
+      done += s.done; total += s.total;
+    });
+    return { done: done, total: total };
+  }
+  function findWorkNode(list, id) {
+    var found = null;
+    (list || []).some(function (it) {
+      if (it.id === id) { found = it; return true; }
+      if (it.sub && it.sub.length) {
+        var f = findWorkNode(it.sub, id);
+        if (f) { found = f; return true; }
+      }
+      return false;
+    });
+    return found;
+  }
+  function removeWorkNode(list, id) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === id) { list.splice(i, 1); return true; }
+      if (list[i].sub && removeWorkNode(list[i].sub, id)) return true;
+    }
+    return false;
   }
 
   /* ---------- 工具 ---------- */
@@ -104,7 +159,12 @@
 
   function renderNav() {
     $('#nav').innerHTML = CATEGORIES.map(function (c) {
-      var total = c.id === 'bill' ? '' : '<span class="nav-total">' + fmt(catTotal(c.id)) + '</span>';
+      /* 工作台类目显示流程进度；设计/账单不再显示金额 */
+      var total = '';
+      if (catType(c.id) === 'work') {
+        var s = countWork(wf[c.id] || []);
+        if (s.total) total = '<span class="nav-total">' + s.done + '/' + s.total + '</span>';
+      }
       return '<button class="nav-item' + (state.current === c.id ? ' active' : '') + '" data-cat="' + c.id + '">' +
                '<span class="nav-ic">' + ICONS[c.id] + '</span>' +
                '<span class="nav-name">' + c.name + '</span>' + total +
@@ -118,39 +178,45 @@
     $('#catIcon').innerHTML = ICONS[cat.id] || '';
     $('#catName').textContent = cat.name;
 
-    var total = state.current === 'bill'
-      ? allRecords().reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0)
-      : catTotal(state.current);
-    $('#topbarTotal').textContent = fmt(total);
-
+    var type = catType(state.current);
     var content;
-    if (state.current === 'bill') content = billView();
-    else if (state.current === 'design' && window.RenoDesign) content = window.RenoDesign.render();
-    else content = categoryView(state.current);
+    if (type === 'bill') {
+      $('#topbarTotal').style.display = '';
+      $('#topbarTotal').textContent = fmt(grandTotal());
+      content = billView();
+    } else if (type === 'design') {
+      $('#topbarTotal').style.display = 'none';
+      content = window.RenoDesign ? window.RenoDesign.render() : '';
+    } else {
+      var s = countWork(wf[state.current] || []);
+      $('#topbarTotal').style.display = '';
+      $('#topbarTotal').textContent = s.total ? s.done + '/' + s.total : '';
+      content = workView(state.current);
+    }
+
     $('#content').innerHTML = content;
-    if (state.current === 'design' && window.RenoDesign) window.RenoDesign.renderTabs();
-    else { $('#topTabs').innerHTML = ''; $('#topbarTotal').style.display = ''; }
+    if (type === 'design' && window.RenoDesign) window.RenoDesign.renderTabs();
+    else $('#topTabs').innerHTML = '';
     bindContentEvents(state.current);
     renderNav();
   }
 
-  /* 记录区 HTML（分类主界面与设计页共用） */
-  function recordSectionHTML(cid) {
-    /* 设计页（含"支出"子页）保持原排版；其他方向统一参考图排版 */
-    return cid === 'design' ? classicRecordHTML(cid) : splitRecordHTML(cid);
-  }
-
-  /* 记录表单（两种排版共用） */
+  /* 记账表单（账单页专用，含分类下拉） */
   function recordFormHTML(editing) {
     return (
       '<form id="recordForm" class="form' + (editing ? ' open' : '') + '" autocomplete="off">' +
         '<h3>' + (editing ? '编辑记录' : '添加记录') + '</h3>' +
         '<div class="form-row">' +
           '<div class="field"><label>日期</label><input type="date" id="fDate" required></div>' +
-          '<div class="field"><label>项目名称</label><input type="text" id="fName" placeholder="如：瓷砖采购" required></div>' +
+          '<div class="field"><label>分类</label><select id="fCat">' +
+            RECORD_CATS.map(function (c) { return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('') +
+          '</select></div>' +
         '</div>' +
         '<div class="form-row">' +
+          '<div class="field"><label>项目名称</label><input type="text" id="fName" placeholder="如：瓷砖采购" required></div>' +
           '<div class="field"><label>金额（元）</label><input type="number" id="fAmount" placeholder="0.00" min="0" step="0.01" required></div>' +
+        '</div>' +
+        '<div class="form-row">' +
           '<div class="field"><label>备注</label><input type="text" id="fNote" placeholder="选填"></div>' +
         '</div>' +
         '<div class="form-actions">' +
@@ -161,67 +227,102 @@
     );
   }
 
-  /* 原排版（设计页使用） */
-  function classicRecordHTML(cid) {
-    var editing = state.editingId !== null;
-    var list = (data[cid] || []).slice().sort(sortRecords);
-    return (
-      '<div class="add-card card">' +
-        '<button class="btn btn-primary btn-block' + (editing ? ' hidden' : '') + '" id="addToggle">＋ 添加记录</button>' +
-        recordFormHTML(editing) +
-      '</div>' +
-      '<div class="stats-row">' +
-        '<div class="stat-card card"><div class="stat-label">累计支出</div><div class="stat-value">' + fmt(catTotal(cid)) + '</div></div>' +
-        '<div class="stat-card card"><div class="stat-label">记录条数</div><div class="stat-value">' + list.length + '</div></div>' +
-      '</div>' +
-      '<div class="section-title">记录明细</div>' +
-      (list.length ? list.map(function (r) { return recordItem(r); }).join('') : emptyState(cid))
-    );
-  }
-
-  /* 参考图排版：顶部装饰大色块 + 左列表右面板 */
-  function splitRecordHTML(cid) {
+  /* ================= 工作台：记录小的工作流程，可打勾划掉、衔接下一步 ================= */
+  function workView(cid) {
     var cat = catOf(cid);
-    var editing = state.editingId !== null;
-    var list = (data[cid] || []).slice().sort(sortRecords);
-    var total = catTotal(cid);
-    var sub = list.length
-      ? fmt(total) + ' · ' + list.length + ' 条记录'
-      : '开始记录装修的每一步吧';
-
+    var list = wf[cid] || [];
+    var s = countWork(list);
+    var items = list.length
+      ? list.map(function (it) { return workItemHTML(it, cid); }).join('')
+      : '<div class="empty">还没有工作流程<br>在上面填写一个，开始记录吧</div>';
     return (
       '<div class="rec-hero">' +
         '<span class="rec-hero-ic">' + ICONS[cat.id] + '</span>' +
         '<div class="rec-hero-t">' +
           '<div class="rec-hero-name">' + cat.name + '</div>' +
-          '<div class="rec-hero-sub">' + sub + '</div>' +
+          '<div class="rec-hero-sub">' + (list.length ? '已完成 ' + s.done + ' / ' + s.total + ' 个流程' : '记录一个小的工作流程') + '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="rec-body">' +
-        '<div class="rec-col-list">' +
-          '<div class="rec-list-head">' +
-            '<span class="rec-list-title">记录明细</span>' +
-            '<button class="btn btn-sm btn-primary" id="addToggle">＋ 添加</button>' +
-          '</div>' +
-          (list.length
-            ? list.map(function (r) { return recordItem(r, cat.icon); }).join('')
-            : emptyState(cid)) +
-        '</div>' +
-        '<aside class="rec-col-panel">' +
-          '<div class="rec-panel-card card">' +
-            '<div class="rec-panel-title">添加记录</div>' +
-            recordFormHTML(editing) +
-          '</div>' +
-          '<div class="rec-stats">' +
-            '<div class="stat-card card"><div class="stat-label">累计支出</div><div class="stat-value">' + fmt(total) + '</div></div>' +
-            '<div class="stat-card card"><div class="stat-label">记录条数</div><div class="stat-value">' + list.length + '</div></div>' +
-          '</div>' +
-        '</aside>' +
-      '</div>'
+      '<div class="wf-add">' +
+        '<input id="wfInput" class="wf-input" placeholder="填写工作流程，如：拆旧墙" maxlength="50" spellcheck="false">' +
+        '<button id="wfAdd" class="btn btn-primary">＋ 添加流程</button>' +
+      '</div>' +
+      '<div class="wf-list">' + items + '</div>'
     );
   }
+  function workItemHTML(it, cid) {
+    var sub = (it.sub || []).length
+      ? '<div class="wf-sub">' + it.sub.map(function (s) { return workItemHTML(s, cid); }).join('') + '</div>'
+      : '';
+    return '<div class="wf-item" data-id="' + it.id + '">' +
+      '<div class="wf-row' + (it.done ? ' done' : '') + '">' +
+        '<button class="wf-check' + (it.done ? ' checked' : '') + '" data-wf="check" title="标记完成">' + (it.done ? '✓' : '') + '</button>' +
+        '<span class="wf-text">' + esc(it.text) + '</span>' +
+        '<span class="wf-tools">' +
+          '<button class="btn btn-sm wf-link" data-wf="link" title="添加衔接流程">＋ 衔接</button>' +
+          '<button class="icon-btn danger" data-wf="del" title="删除">' + ICONS.trash + '</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="wf-inline hidden" data-inline="' + it.id + '">' +
+        '<input class="wf-input" data-inline-input maxlength="50" placeholder="填写衔接的下一步…" spellcheck="false">' +
+        '<button class="btn btn-sm btn-primary" data-inline-ok>添加</button>' +
+        '<button class="btn btn-sm" data-inline-cancel>取消</button>' +
+      '</div>' +
+      sub +
+    '</div>';
+  }
+  function bindWorkEvents(cid) {
+    var input = $('#wfInput');
+    var addBtn = $('#wfAdd');
+    var doAdd = function () {
+      var text = input.value.trim();
+      if (!text) { toast('先填写流程内容'); return; }
+      if (!Array.isArray(wf[cid])) wf[cid] = [];
+      wf[cid].push({ id: uid(), text: text.slice(0, 50), done: false, sub: [] });
+      saveWorkflow(); render();
+    };
+    if (addBtn) addBtn.addEventListener('click', doAdd);
+    if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') doAdd(); });
 
-  function categoryView(cid) { return recordSectionHTML(cid); }
+    document.querySelectorAll('.wf-item').forEach(function (item) {
+      var node = findWorkNode(wf[cid], item.dataset.id);
+      if (!node) return;
+      item.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-wf]');
+        if (!btn) return;
+        if (btn.dataset.wf === 'check') {
+          node.done = !node.done;
+          saveWorkflow(); render();
+        } else if (btn.dataset.wf === 'del') {
+          if (!confirm('删除这个流程（连同它的衔接流程）吗？')) return;
+          removeWorkNode(wf[cid], item.dataset.id);
+          saveWorkflow(); render();
+        } else if (btn.dataset.wf === 'link') {
+          var wrap = item.querySelector('.wf-inline');
+          if (wrap) wrap.classList.toggle('hidden');
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-inline]').forEach(function (wrap) {
+      var pid = wrap.closest('.wf-item').dataset.id;
+      var ok = wrap.querySelector('[data-inline-ok]');
+      var cancel = wrap.querySelector('[data-inline-cancel]');
+      var inp = wrap.querySelector('[data-inline-input]');
+      var doAddSub = function () {
+        var text = inp.value.trim();
+        if (!text) { toast('先填写流程内容'); return; }
+        var parent = findWorkNode(wf[cid], pid);
+        if (!parent) return;
+        if (!Array.isArray(parent.sub)) parent.sub = [];
+        parent.sub.push({ id: uid(), text: text.slice(0, 50), done: false, sub: [] });
+        saveWorkflow(); render();
+      };
+      ok.addEventListener('click', doAddSub);
+      cancel.addEventListener('click', function () { wrap.classList.add('hidden'); });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doAddSub(); });
+    });
+  }
 
   function recordItem(r, iconKey) {
     return (
@@ -245,28 +346,24 @@
     );
   }
 
-  function emptyState(cid) {
-    var cat = catOf(cid);
-    return '<div class="empty">还没有「' + cat.name + '」的记录<br>点击"＋ 添加"开始记录吧</div>';
-  }
-
   function billView() {
-    var rows = RECORD_CATS.map(function (c) {
-      return { cid: c.id, icon: c.icon, name: c.name, total: catTotal(c.id), count: (data[c.id] || []).length };
-    }).filter(function (r) { return r.total > 0; })
-      .sort(function (a, b) { return b.total - a.total; });
-
+    var groups = RECORD_CATS.map(function (c) {
+      return { cid: c.id, list: (data[c.id] || []).slice().sort(sortRecords) };
+    });
     var all = allRecords();
-    var grand = rows.reduce(function (s, r) { return s + r.total; }, 0);
-    var max = rows.length ? rows[0].total : 0;
-    var recent = all.slice(0, 5);
+    var grand = grandTotal();
+    var rows = groups.filter(function (g) { return catTotal(g.cid) > 0; })
+      .sort(function (a, b) { return catTotal(b.cid) - catTotal(a.cid); });
+    var max = rows.length ? catTotal(rows[0].cid) : 0;
+    var editing = state.editingId !== null;
+    var withRec = groups.filter(function (g) { return g.list.length > 0; });
 
     return (
       '<div class="rec-hero">' +
         '<span class="rec-hero-ic">' + ICONS.bill + '</span>' +
         '<div class="rec-hero-t">' +
           '<div class="rec-hero-name">账单</div>' +
-          '<div class="rec-hero-sub">全部分类 · 支出汇总</div>' +
+          '<div class="rec-hero-sub">' + (all.length ? '总支出 ' + fmt(grand) + ' · ' + all.length + ' 条记录' : '记账中心 · 开始记录装修的每一步吧') + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="bill-summary">' +
@@ -277,54 +374,54 @@
         '</div>' +
         '<div class="bill-hero accent">' +
           '<div class="bill-hero-label">最高支出分类</div>' +
-          '<div class="bill-hero-value small">' + (rows.length ? ICONS[rows[0].icon] + ' ' + rows[0].name : '暂无') + '</div>' +
-          '<div class="bill-hero-sub">' + (rows.length ? fmt(rows[0].total) : '—') + '</div>' +
+          '<div class="bill-hero-value small">' + (rows.length ? ICONS[rows[0].cid] + ' ' + catOf(rows[0].cid).name : '暂无') + '</div>' +
+          '<div class="bill-hero-sub">' + (rows.length ? fmt(catTotal(rows[0].cid)) : '—') + '</div>' +
         '</div>' +
+      '</div>' +
+      '<div class="add-card card">' +
+        '<button class="btn btn-primary btn-block' + (editing ? ' hidden' : '') + '" id="addToggle">＋ 记账</button>' +
+        recordFormHTML(editing) +
       '</div>' +
       '<div class="section-title">分类占比</div>' +
       (rows.length
         ? rows.map(function (r) {
-            var w = max ? Math.max(2, r.total / max * 100) : 0;
+            var c = catOf(r.cid);
+            var w = max ? Math.max(2, catTotal(r.cid) / max * 100) : 0;
             return '<div class="bill-row card">' +
-                     '<span class="bill-ic">' + ICONS[r.icon] + '</span>' +
+                     '<span class="bill-ic">' + ICONS[c.id] + '</span>' +
                      '<div class="bill-mid">' +
-                       '<div class="bill-name">' + r.name + ' <span class="bill-count">' + r.count + ' 条</span></div>' +
+                       '<div class="bill-name">' + c.name + ' <span class="bill-count">' + r.list.length + ' 条</span></div>' +
                        '<div class="bar"><div class="bar-fill" style="width:' + w + '%"></div></div>' +
                      '</div>' +
-                     '<span class="bill-total">' + fmt(r.total) + '</span>' +
+                     '<span class="bill-total">' + fmt(catTotal(r.cid)) + '</span>' +
                    '</div>';
           }).join('')
-        : '<div class="empty">还没有任何记录<br>点左上角菜单，选择一个方向开始记账吧</div>') +
-      (recent.length
-        ? '<div class="section-title" style="margin-top:20px">最近记录</div>' +
-          recent.map(recentItem).join('')
+        : '<div class="empty">还没有任何记录<br>点击"＋ 记账"添加第一笔吧</div>') +
+      (withRec.length
+        ? '<div class="section-title" style="margin-top:20px">记录明细</div>' +
+          withRec.map(function (g) {
+            var c = catOf(g.cid);
+            return '<div class="bill-group">' +
+                     '<div class="bill-group-head">' +
+                       '<span class="bill-group-ic">' + ICONS[c.id] + '</span>' +
+                       '<span class="bill-group-name">' + c.name + '</span>' +
+                       '<span class="bill-group-total">' + fmt(catTotal(g.cid)) + '</span>' +
+                     '</div>' +
+                     g.list.map(function (r) { return recordItem(r); }).join('') +
+                   '</div>';
+          }).join('')
         : '')
-    );
-  }
-
-  function recentItem(r) {
-    var cat = catOf(r.category);
-    return (
-      '<div class="record card">' +
-        '<div class="record-info">' +
-          '<div class="record-top">' +
-            '<span class="record-date">' + (cat ? ICONS[cat.icon] + ' ' + cat.name : '') + '</span>' +
-            '<span class="record-name">' + esc(r.name) + '</span>' +
-            '<span class="record-date">' + esc(r.date) + '</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="record-right"><div class="record-amount">' + fmt(r.amount) + '</div></div>' +
-      '</div>'
     );
   }
 
   /* ---------- 事件绑定 ---------- */
   function bindContentEvents(cid) {
-    if (state.current === 'design' && window.RenoDesign) { window.RenoDesign.bind(); return; }
-    bindRecordEvents(cid);
+    if (catType(cid) === 'design' && window.RenoDesign) { window.RenoDesign.bind(); return; }
+    if (catType(cid) === 'bill') { bindBillEvents(); return; }
+    bindWorkEvents(cid);
   }
 
-  function bindRecordEvents(cid) {
+  function bindBillEvents() {
     var toggle = $('#addToggle');
     var form = $('#recordForm');
     var cancel = $('#fCancel');
@@ -332,69 +429,87 @@
     if (toggle) toggle.addEventListener('click', function () {
       form.classList.add('open');
       clearForm();
-      /* 展开后滚动到表单（手机端表单在下方右侧面板） */
       setTimeout(function () { form.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
     });
 
     if (form) form.addEventListener('submit', function (e) {
       e.preventDefault();
-      onSubmit(cid);
+      onSubmitBill();
     });
 
     if (cancel) cancel.addEventListener('click', function () {
-      state.editingId = null;
+      state.editingId = null; state.editingCat = null;
       render();
     });
 
     document.querySelectorAll('[data-act]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var id = btn.closest('.record').dataset.id;
-        if (btn.dataset.act === 'edit') startEdit(cid, id);
-        else delRecord(cid, id);
+        if (btn.dataset.act === 'edit') startEdit(id);
+        else delRecord(id);
       });
     });
   }
 
   function clearForm() {
     $('#fDate').value = todayStr();
+    $('#fCat').value = RECORD_CATS[0].id;
     $('#fName').value = '';
     $('#fAmount').value = '';
     $('#fNote').value = '';
   }
 
-  function startEdit(cid, id) {
-    var r = (data[cid] || []).find(function (x) { return x.id === id; });
-    if (!r) return;
-    state.editingId = id;
+  function startEdit(id) {
+    var rec = null, catId = null;
+    RECORD_CATS.forEach(function (c) {
+      if (rec) return;
+      var r = (data[c.id] || []).find(function (x) { return x.id === id; });
+      if (r) { rec = r; catId = c.id; }
+    });
+    if (!rec) return;
+    state.editingId = id; state.editingCat = catId;
     render();
-    $('#fDate').value = r.date;
-    $('#fName').value = r.name;
-    $('#fAmount').value = r.amount;
-    $('#fNote').value = r.note || '';
+    $('#fDate').value = rec.date;
+    $('#fCat').value = catId;
+    $('#fName').value = rec.name;
+    $('#fAmount').value = rec.amount;
+    $('#fNote').value = rec.note || '';
     $('#fName').focus();
     var f = $('#recordForm');
     if (f) setTimeout(function () { f.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
   }
 
-  function onSubmit(cid) {
+  function onSubmitBill() {
     var date = $('#fDate').value;
+    var catId = $('#fCat').value;
     var name = $('#fName').value.trim();
     var amount = parseFloat($('#fAmount').value);
     var note = $('#fNote').value.trim();
 
     if (!date || !name || isNaN(amount)) { toast('请填写完整的项目信息'); return; }
 
-    if (!Array.isArray(data[cid])) data[cid] = [];
-
     if (state.editingId) {
-      var r = data[cid].find(function (x) { return x.id === state.editingId; });
-      if (r) { r.date = date; r.name = name; r.amount = amount; r.note = note; }
-      state.editingId = null;
+      /* 编辑：找到记录原属分类；若改了分类则搬移到新分类 */
+      var rec = null, oldCat = null;
+      RECORD_CATS.forEach(function (c) {
+        if (rec) return;
+        var r = (data[c.id] || []).find(function (x) { return x.id === state.editingId; });
+        if (r) { rec = r; oldCat = c.id; }
+      });
+      if (rec) {
+        rec.date = date; rec.name = name; rec.amount = amount; rec.note = note;
+        if (oldCat !== catId) {
+          data[oldCat] = (data[oldCat] || []).filter(function (x) { return x.id !== rec.id; });
+          if (!Array.isArray(data[catId])) data[catId] = [];
+          data[catId].push(rec);
+        }
+      }
+      state.editingId = null; state.editingCat = null;
       toast('修改成功 ✓');
     } else {
-      data[cid].push({
-        id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        date: date, name: name, amount: amount, note: note, createdAt: Date.now()
+      if (!Array.isArray(data[catId])) data[catId] = [];
+      data[catId].push({
+        id: uid(), date: date, name: name, amount: amount, note: note, createdAt: Date.now()
       });
       toast('添加成功 ✓');
     }
@@ -402,9 +517,11 @@
     render();
   }
 
-  function delRecord(cid, id) {
+  function delRecord(id) {
     if (!confirm('确定删除这条记录吗？')) return;
-    data[cid] = (data[cid] || []).filter(function (x) { return x.id !== id; });
+    RECORD_CATS.forEach(function (c) {
+      data[c.id] = (data[c.id] || []).filter(function (x) { return x.id !== id; });
+    });
     save();
     render();
     toast('已删除');
@@ -430,14 +547,13 @@
     if (!item) return;
     state.current = item.dataset.cat;   // 跳转到该方向的主界面
     state.editingId = null;
+    state.editingCat = null;
     closeSidebar();                     // 主界面占整个界面 100%
     render();
   });
 
   /* ---------- 暴露给设计板块（design.js）共用 ---------- */
   window.RenoApp = {
-    recordSectionHTML: recordSectionHTML,
-    bindRecordEvents: bindRecordEvents,
     refresh: render,
     toast: toast,
     esc: esc,

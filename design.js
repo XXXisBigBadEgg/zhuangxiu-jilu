@@ -14,7 +14,7 @@
   /* ---------- 存储（图纸 + 灵感墙） ---------- */
   var data = load();
   if (!Array.isArray(data.wall)) data.wall = [];
-  var tab = 'records';   // 设计下的子类目：支出 / 图纸 / 灵感墙
+  var tab = 'wall';   // 设计下的子类目：图纸 / 灵感墙
 
   function load() {
     try {
@@ -57,7 +57,6 @@
 
   /* ---------- 子类目切换（位于内容区顶部，居中，切换时布局稳定不位移） ---------- */
   var TABS = [
-    { key: 'records',    label: '支出' },
     { key: 'blueprints', label: '图纸' },
     { key: 'wall',       label: '灵感墙' }
   ];
@@ -69,18 +68,16 @@
   }
 
   function renderTabs() {
-    /* 顶栏不再放子按钮；保留顶栏总额显示，避免切换时顶栏重排位移 */
+    /* 顶栏不再放子按钮；设计页不再有支出，隐藏顶栏总额避免空位 */
     var el = $('#topTabs');
     if (el) el.innerHTML = '';
     var totalEl = $('#topbarTotal');
-    if (totalEl) totalEl.style.display = '';
+    if (totalEl) totalEl.style.display = 'none';
   }
 
   /* ---------- 渲染分发 ---------- */
   function render() {
-    return tabBarHTML() + (tab === 'blueprints' ? blueprintsHTML()
-      : tab === 'wall' ? wallHTML()
-      : App.recordSectionHTML('design'));
+    return tabBarHTML() + (tab === 'blueprints' ? blueprintsHTML() : wallHTML());
   }
 
   function bind() {
@@ -88,8 +85,7 @@
       b.addEventListener('click', function () { tab = b.dataset.dtab; App.refresh(); });
     });
     if (tab === 'blueprints') return bindBlueprints();
-    if (tab === 'wall') return bindWall();
-    App.bindRecordEvents('design');
+    bindWall();
   }
 
   /* ================= 图纸 ================= */
