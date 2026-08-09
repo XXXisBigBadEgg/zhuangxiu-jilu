@@ -537,6 +537,67 @@ svg.ic { width: 20px; height: 20px; vertical-align: -0.18em; }
 .tcard-name:focus { border-color: var(--yellow); background: #fff; box-shadow: 0 0 0 2px rgba(245, 197, 66, .25); }
 .tcard-name.static { cursor: default; }
 
+/* ============ 点子（文字 + 可选配图） ============ */
+.wall-src.idea { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.wall-idea-input {
+  width: 100%; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: #fff; color: var(--ink);
+  font-size: 14px; line-height: 1.6; outline: none;
+  resize: vertical; font-family: inherit;
+}
+.wall-idea-input:focus { border-color: var(--yellow); box-shadow: 0 0 0 3px rgba(245, 197, 66, .22); }
+.wall-idea-pics { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wall-idea-row { display: flex; align-items: center; gap: 8px; }
+.wall-idea-thumb {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 4px;
+}
+.wall-idea-thumb.hidden { display: none; }
+.wall-idea-thumb img { width: 64px; height: 48px; object-fit: cover; border-radius: 7px; display: block; }
+
+/* 点子卡片 */
+.tcard.idea-card { display: flex; flex-direction: column; }
+.idea-card .tcard-idea-text {
+  padding: 10px 12px; font-size: 13px; line-height: 1.6; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+  white-space: pre-wrap; word-break: break-word; flex: 1;
+}
+.idea-card:not(.has-img) .tcard-idea-text { min-height: 78px; }
+.idea-card .tcard-meta { border-top: 1px solid var(--line); }
+.idea-tag {
+  flex: 1; font-size: 12px; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.idea-tag svg { width: 14px; height: 14px; }
+
+/* 点子弹层 */
+.idea-modal {
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(22, 18, 10, .45);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.idea-modal.open { display: flex; }
+.idea-modal-box {
+  width: 100%; max-width: 420px; max-height: 84vh; overflow: auto;
+  background: var(--cream); border-radius: 16px; padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: var(--shadow); animation: fade .18s ease;
+}
+.idea-modal-head { display: flex; align-items: center; justify-content: space-between; }
+.idea-modal-title { font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.idea-modal-title svg { width: 18px; height: 18px; color: var(--yellow-deep); }
+.idea-modal-pic { position: relative; }
+.idea-modal-pic.hidden { display: none; }
+.idea-modal-pic img {
+  width: 100%; max-height: 46vh; object-fit: contain;
+  border-radius: 10px; background: #fff; display: block; cursor: zoom-in;
+}
+.idea-modal-pic-hint { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; text-align: center; }
+.idea-modal-actions { display: flex; align-items: center; gap: 8px; }
+.idea-modal-actions .spacer { flex: 1; }
+
 @media (max-width: 640px) {
   .top-tab { padding: 5px 9px; font-size: 12px; }
 }

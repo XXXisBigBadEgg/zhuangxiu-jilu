@@ -143,6 +143,7 @@
           '<div class="wall-panel-tabs">' +
             '<button class="wptab active" data-src="image">' + IC.image + ' 图片</button>' +
             '<button class="wptab" data-src="link">' + IC.link + ' 链接</button>' +
+            '<button class="wptab" data-src="idea">' + IC.lightbulb + ' 点子</button>' +
           '</div>' +
           '<div class="wall-panel-body">' +
             '<div class="wall-src image">' +
@@ -153,12 +154,24 @@
               '<input id="wallUrl" class="wall-url-input" placeholder="粘贴链接，多余字符自动清理" spellcheck="false">' +
               '<button id="wallAddUrl" class="btn btn-primary btn-sm">添加</button>' +
             '</div>' +
+            '<div class="wall-src idea hidden">' +
+              '<textarea id="wallIdeaText" class="wall-idea-input" rows="3" maxlength="500" placeholder="写下你的好点子…" spellcheck="false"></textarea>' +
+              '<div class="wall-idea-pics">' +
+                '<label class="btn">' + IC.image + ' 配图（可选）<input type="file" id="wallIdeaFile" accept="image/*" hidden></label>' +
+                '<span id="wallIdeaThumb" class="wall-idea-thumb hidden"><img id="wallIdeaThumbImg" alt=""><button id="wallIdeaRemove" type="button" class="btn btn-sm">移除</button></span>' +
+                '<span class="wall-hint">文字必填，配图可留空</span>' +
+              '</div>' +
+              '<div class="wall-idea-row">' +
+                '<button id="wallAddIdea" class="btn btn-primary btn-sm">添加</button>' +
+              '</div>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
       '<div class="thumb-grid wall">' + items + '</div>';
   }
   function wallItem(it) {
+    if (it.type === 'idea') return ideaItem(it);
     var isLink = it.type === 'link';
     var cover = isLink
       ? '<div class="tcard-cover link">' +
@@ -203,6 +216,8 @@
     document.querySelectorAll('.tcard').forEach(function (card) {
       card.addEventListener('click', function (e) {
         if (e.target.closest('.tcard-del')) { e.stopPropagation(); delItem(card.dataset.id, false); return; }
+        if (e.target.closest('.idea-tag')) return;   // 点子标签不响应
+        if (card.classList.contains('idea-card')) { openIdea(card.dataset.id); return; }
         if (e.target.closest('.tcard-name')) return;   // 交给输入框自己处理
         if (card.classList.contains('link-card')) window.open(card.dataset.url, '_blank', 'noopener');
         else openWallImage(card.dataset.id);
@@ -215,6 +230,7 @@
         renameItem(inp.closest('.tcard').dataset.id, inp.value);
       });
     });
+    initIdeaPanel();
   }
   function renameItem(id, val) {
     var it = data.wall.find(function (x) { return x.id === id; });
@@ -228,6 +244,176 @@
     if (isBp) data.blueprints = data.blueprints.filter(function (b) { return b.id !== id; });
     else data.wall = data.wall.filter(function (it) { return it.id !== id; });
     save(); App.refresh();
+  }
+
+  /* ================= 点子：文字 + 可选配图 ================= */
+  function ideaItem(it) {
+    var hasImg = !!it.thumb;
+    return '<div class="tcard idea-card' + (hasImg ? ' has-img' : '') + '" data-id="' + it.id + '">' +
+      (hasImg ? '<div class="tcard-cover"><img src="' + esc(it.thumb) + '" alt="" loading="lazy"></div>' : '') +
+      '<div class="tcard-idea-text">' + esc(it.text) + '</div>' +
+      '<div class="tcard-meta">' +
+        '<span class="idea-tag">' + IC.lightbulb + ' 点子</span>' +
+        '<button class="tcard-del" data-del title="删除">' + IC.x + '</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  var ideaDraft = { text: '', thumb: '', full: '' };
+
+  function initIdeaPanel() {
+    var ideaText = $('#wallIdeaText');
+    var ideaFile = $('#wallIdeaFile');
+    var ideaThumb = $('#wallIdeaThumb');
+    var ideaThumbImg = $('#wallIdeaThumbImg');
+    var ideaRemove = $('#wallIdeaRemove');
+    var addIdea = $('#wallAddIdea');
+    if (!ideaText || !ideaFile || !addIdea) return;
+
+    ideaFile.addEventListener('change', function () {
+      readIdeaImage(ideaFile.files[0]);
+      ideaFile.value = '';
+    });
+    ideaRemove.addEventListener('click', function () {
+      ideaDraft.thumb = ideaDraft.full = '';
+      ideaThumb.classList.add('hidden');
+      ideaThumbImg.removeAttribute('src');
+    });
+    addIdea.addEventListener('click', function () {
+      var text = ideaText.value.trim();
+      if (!text) { toast('先写下你的点子'); return; }
+      data.wall.push({
+        id: uid(), type: 'idea', text: text.slice(0, 500),
+        thumb: ideaDraft.thumb, full: ideaDraft.full,
+        canBake: true, createdAt: Date.now()
+      });
+      ideaText.value = '';
+      ideaDraft = { text: '', thumb: '', full: '' };
+      ideaThumb.classList.add('hidden');
+      ideaThumbImg.removeAttribute('src');
+      $('#wallPanel').classList.add('hidden');
+      save(); App.refresh();
+    });
+  }
+
+  function readIdeaImage(file) {
+    if (!file || !/^image\//.test(file.type || '')) { toast('仅支持图片文件'); return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var img = new Image();
+      img.onload = function () {
+        ideaDraft.thumb = compress(img, 320, 0.65);
+        ideaDraft.full = compress(img, 1600, 0.78);
+        var t = $('#wallIdeaThumb'), ti = $('#wallIdeaThumbImg');
+        ti.src = ideaDraft.thumb;
+        t.classList.remove('hidden');
+      };
+      img.onerror = function () { toast('图片读取失败'); };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* ---------- 点子弹层：查看 / 编辑文字与配图 ---------- */
+  var ideaModal = null, ideaCurrent = null;
+
+  function buildIdeaModal() {
+    if (ideaModal) return;
+    ideaModal = document.createElement('div');
+    ideaModal.className = 'idea-modal';
+    ideaModal.innerHTML =
+      '<div class="idea-modal-box">' +
+        '<div class="idea-modal-head">' +
+          '<span class="idea-modal-title">' + IC.lightbulb + ' 点子</span>' +
+          '<button id="ideaClose" class="icon-btn" title="关闭">' + IC.x + '</button>' +
+        '</div>' +
+        '<div class="idea-modal-body">' +
+          '<div id="ideaPic" class="idea-modal-pic hidden">' +
+            '<img id="ideaImg" alt="">' +
+            '<span class="idea-modal-pic-hint">点击图片放大查看 / 标注</span>' +
+          '</div>' +
+          '<textarea id="ideaText" class="wall-idea-input" rows="6" maxlength="500" placeholder="写下你的好点子…" spellcheck="false"></textarea>' +
+        '</div>' +
+        '<div class="idea-modal-actions">' +
+          '<label class="btn btn-sm">' + IC.image + ' 配图<input type="file" id="ideaFile" accept="image/*" hidden></label>' +
+          '<span class="spacer"></span>' +
+          '<button id="ideaDel" class="btn btn-sm danger">删除</button>' +
+          '<button id="ideaSave" class="btn btn-sm btn-primary">保存</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ideaModal);
+
+    ideaModal.addEventListener('click', function (e) { if (e.target === ideaModal) closeIdea(); });
+    $('#ideaClose').addEventListener('click', closeIdea);
+    $('#ideaSave').addEventListener('click', function () {
+      if (!ideaCurrent) return;
+      var text = $('#ideaText').value.trim();
+      if (!text) { toast('点子不能为空'); return; }
+      ideaCurrent.text = text.slice(0, 500);
+      save(); App.refresh();
+      closeIdea();
+      toast('已保存 ✓');
+    });
+    $('#ideaDel').addEventListener('click', function () {
+      if (!ideaCurrent) return;
+      if (!confirm('删除这条点子吗？')) return;
+      data.wall = data.wall.filter(function (x) { return x.id !== ideaCurrent.id; });
+      save(); App.refresh();
+      closeIdea();
+      toast('已删除');
+    });
+    $('#ideaImg').addEventListener('click', function () {
+      if (!ideaCurrent || !ideaCurrent.full) return;
+      openViewer({
+        src: ideaCurrent.full, title: '点子配图', canBake: true,
+        onSave: function (baked) {
+          ideaCurrent.full = baked.full; ideaCurrent.thumb = baked.thumb; ideaCurrent.canBake = true;
+          save(); $('#ideaImg').src = baked.full;
+        }
+      });
+    });
+    $('#ideaFile').addEventListener('change', function () {
+      var f = this.files[0];
+      if (f && /^image\//.test(f.type || '')) readModalImage(f);
+      else if (f) toast('仅支持图片文件');
+      this.value = '';
+    });
+  }
+  function readModalImage(file) {
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var img = new Image();
+      img.onload = function () {
+        ideaCurrent.thumb = compress(img, 320, 0.65);
+        ideaCurrent.full = compress(img, 1600, 0.78);
+        ideaCurrent.canBake = true;
+        $('#ideaImg').src = ideaCurrent.full;
+        $('#ideaPic').classList.remove('hidden');
+        save();
+        toast('配图已更新');
+      };
+      img.onerror = function () { toast('图片读取失败'); };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  function openIdea(id) {
+    var it = data.wall.find(function (x) { return x.id === id; });
+    if (!it) return;
+    buildIdeaModal();
+    ideaCurrent = it;
+    $('#ideaText').value = it.text || '';
+    var pic = $('#ideaPic'), img = $('#ideaImg');
+    if (it.full) { img.src = it.full; pic.classList.remove('hidden'); }
+    else { pic.classList.add('hidden'); img.removeAttribute('src'); }
+    ideaModal.classList.add('open');
+    document.body.classList.add('no-scroll');
+  }
+  function closeIdea() {
+    if (!ideaModal) return;
+    ideaModal.classList.remove('open');
+    ideaCurrent = null;
+    document.body.classList.remove('no-scroll');
   }
 
   /* ---------- 文件上传 ---------- */
