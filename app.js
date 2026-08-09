@@ -46,7 +46,7 @@
   };
   window.RENO_ICONS = ICONS;
 
-  var state = { current: 'bill', editingId: null, editingCat: null };
+  var state = { current: 'design', editingId: null, editingCat: null };
 
   /* 数据：data[分类id] = [{ id, date, name, amount, note, createdAt }] */
   var data = load();

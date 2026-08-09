@@ -137,20 +137,12 @@
         '<button id="wallAdd" class="btn btn-primary">＋ 添加灵感</button>' +
         '<div class="wall-panel hidden" id="wallPanel">' +
           '<div class="wall-panel-tabs">' +
-            '<button class="wptab active" data-src="image">' + IC.image + ' 图片</button>' +
+            '<button class="wptab active" data-src="idea">' + IC.lightbulb + ' 点子</button>' +
+            '<button class="wptab" data-src="image">' + IC.image + ' 图片</button>' +
             '<button class="wptab" data-src="link">' + IC.link + ' 链接</button>' +
-            '<button class="wptab" data-src="idea">' + IC.lightbulb + ' 点子</button>' +
           '</div>' +
           '<div class="wall-panel-body">' +
-            '<div class="wall-src image">' +
-              '<label class="btn">' + IC.image + ' 选择图片<input type="file" id="wallFile" accept="image/*" hidden multiple></label>' +
-              '<span class="wall-hint">支持多张 · 自动压缩保存</span>' +
-            '</div>' +
-            '<div class="wall-src link hidden">' +
-              '<input id="wallUrl" class="wall-url-input" placeholder="粘贴链接，多余字符自动清理" spellcheck="false">' +
-              '<button id="wallAddUrl" class="btn btn-primary btn-sm">添加</button>' +
-            '</div>' +
-            '<div class="wall-src idea hidden">' +
+            '<div class="wall-src idea">' +
               '<textarea id="wallIdeaText" class="wall-idea-input" rows="3" maxlength="500" placeholder="写下你的好点子…" spellcheck="false"></textarea>' +
               '<div class="wall-idea-pics">' +
                 '<label class="btn">' + IC.image + ' 配图（可选）<input type="file" id="wallIdeaFile" accept="image/*" hidden></label>' +
@@ -160,6 +152,14 @@
               '<div class="wall-idea-row">' +
                 '<button id="wallAddIdea" class="btn btn-primary btn-sm">添加</button>' +
               '</div>' +
+            '</div>' +
+            '<div class="wall-src image hidden">' +
+              '<label class="btn">' + IC.image + ' 选择图片<input type="file" id="wallFile" accept="image/*" hidden multiple></label>' +
+              '<span class="wall-hint">支持多张 · 自动压缩保存</span>' +
+            '</div>' +
+            '<div class="wall-src link hidden">' +
+              '<input id="wallUrl" class="wall-url-input" placeholder="粘贴链接，多余字符自动清理" spellcheck="false">' +
+              '<button id="wallAddUrl" class="btn btn-primary btn-sm">添加</button>' +
             '</div>' +
           '</div>' +
         '</div>' +

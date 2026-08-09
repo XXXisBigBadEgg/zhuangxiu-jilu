@@ -1,5 +1,5 @@
 /* 兵子装修台 · Service Worker：离线缓存，支持添加到主屏幕后离线使用 */
-const CACHE = 'zhuangxiu-v7';
+const CACHE = 'zhuangxiu-v8';
 const ASSETS = [
   './',
   './index.html',
