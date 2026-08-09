@@ -603,7 +603,9 @@ svg.ic { width: 20px; height: 20px; vertical-align: -0.18em; }
 }
 
 /* ============ 工作台（流程清单） ============ */
-.wf-add { display: flex; gap: 10px; margin-bottom: 16px; }
+.wf-add { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.wf-addbox { display: flex; gap: 8px; }
+.wf-addbox .wf-input { flex: 1; }
 .wf-input {
   flex: 1; min-width: 0; padding: 10px 12px;
   border: 1px solid var(--line); border-radius: 10px;

@@ -117,7 +117,13 @@
   }
   function removeWorkNode(list, id) {
     for (var i = 0; i < list.length; i++) {
-      if (list[i].id === id) { list.splice(i, 1); return true; }
+      if (list[i].id === id) {
+        /* 删除本流程，但其下一级衔接流程顶替它的位置，继续保留 */
+        var kids = list[i].sub || [];
+        var args = [i, 1].concat(kids);
+        list.splice.apply(list, args);
+        return true;
+      }
       if (list[i].sub && removeWorkNode(list[i].sub, id)) return true;
     }
     return false;
@@ -234,7 +240,7 @@
     var s = countWork(list);
     var items = list.length
       ? list.map(function (it) { return workItemHTML(it, cid); }).join('')
-      : '<div class="empty">还没有工作流程<br>在上面填写一个，开始记录吧</div>';
+      : '<div class="empty">还没有工作流程<br>点「＋ 添加流程」开始记录吧</div>';
     return (
       '<div class="rec-hero">' +
         '<span class="rec-hero-ic">' + ICONS[cat.id] + '</span>' +
@@ -244,8 +250,12 @@
         '</div>' +
       '</div>' +
       '<div class="wf-add">' +
-        '<input id="wfInput" class="wf-input" placeholder="填写工作流程，如：拆旧墙" maxlength="50" spellcheck="false">' +
-        '<button id="wfAdd" class="btn btn-primary">＋ 添加流程</button>' +
+        '<button id="wfAdd" class="btn btn-primary btn-block">＋ 添加流程</button>' +
+        '<div class="wf-addbox hidden" id="wfAddBox">' +
+          '<input id="wfInput" class="wf-input" placeholder="填写工作流程，如：拆旧墙" maxlength="50" spellcheck="false">' +
+          '<button class="btn btn-sm btn-primary" data-add-ok>添加</button>' +
+          '<button class="btn btn-sm" data-add-cancel>取消</button>' +
+        '</div>' +
       '</div>' +
       '<div class="wf-list">' + items + '</div>'
     );
@@ -272,29 +282,46 @@
     '</div>';
   }
   function bindWorkEvents(cid) {
-    var input = $('#wfInput');
     var addBtn = $('#wfAdd');
+    var addBox = $('#wfAddBox');
+    var input = $('#wfInput');
+    var closeBox = function () { if (addBox) addBox.classList.add('hidden'); };
+    var openBox = function () {
+      if (!addBox) return;
+      addBox.classList.remove('hidden');
+      if (input) input.focus();
+    };
     var doAdd = function () {
       var text = input.value.trim();
       if (!text) { toast('先填写流程内容'); return; }
       if (!Array.isArray(wf[cid])) wf[cid] = [];
       wf[cid].push({ id: uid(), text: text.slice(0, 50), done: false, sub: [] });
+      closeBox();
       saveWorkflow(); render();
     };
-    if (addBtn) addBtn.addEventListener('click', doAdd);
+    if (addBtn) addBtn.addEventListener('click', openBox);
     if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') doAdd(); });
+    if (addBox) {
+      var ok = addBox.querySelector('[data-add-ok]');
+      var cancel = addBox.querySelector('[data-add-cancel]');
+      if (ok) ok.addEventListener('click', doAdd);
+      if (cancel) cancel.addEventListener('click', closeBox);
+    }
 
+    /* 每个流程项自己的按钮（勾选/衔接/删除）。子流程在父级内部，点击会冒泡到父级监听器，
+       必须确认按钮只属于本级，否则勾选/删除/衔接会连带影响父流程。 */
     document.querySelectorAll('.wf-item').forEach(function (item) {
       var node = findWorkNode(wf[cid], item.dataset.id);
       if (!node) return;
       item.addEventListener('click', function (e) {
         var btn = e.target.closest('[data-wf]');
         if (!btn) return;
+        if (btn.closest('.wf-item') !== item) return;   /* 冒泡自子流程的按钮，忽略 */
         if (btn.dataset.wf === 'check') {
           node.done = !node.done;
           saveWorkflow(); render();
         } else if (btn.dataset.wf === 'del') {
-          if (!confirm('删除这个流程（连同它的衔接流程）吗？')) return;
+          if (!confirm('删除这个流程吗？它下面的衔接流程会保留并顶上来。')) return;
           removeWorkNode(wf[cid], item.dataset.id);
           saveWorkflow(); render();
         } else if (btn.dataset.wf === 'link') {
