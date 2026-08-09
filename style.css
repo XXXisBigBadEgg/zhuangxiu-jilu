@@ -30,7 +30,7 @@ body {
 }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
-input  { font-family: inherit; font-size: 14px; color: var(--ink); }
+input, select, textarea { font-family: inherit; font-size: 16px; color: var(--ink); }
 
 /* ---------- 左页面：侧边栏 ---------- */
 #sidebar {
@@ -359,7 +359,7 @@ body.sidebar-open #backdrop { opacity: 1; pointer-events: auto; }
 .wall-name-input {
   flex: 0 1 180px; min-width: 120px; padding: 7px 10px;
   border: 1px solid var(--line); border-radius: 10px;
-  background: var(--cream); font-size: 14px; font-weight: 600; outline: none;
+  background: var(--cream); font-size: 16px; font-weight: 600; outline: none;
 }
 .wall-name-input:focus {
   border-color: var(--yellow);
@@ -413,7 +413,7 @@ body.sidebar-open #backdrop { opacity: 1; pointer-events: auto; }
 .viewer-toolbar .sw.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, .4); }
 #vWidth {
   background: #2a2419; color: #fff; border: 1px solid rgba(255, 255, 255, .2);
-  border-radius: 8px; padding: 4px 6px; font-size: 13px; outline: none;
+  border-radius: 8px; padding: 4px 6px; font-size: 16px; outline: none;
 }
 .viewer-toolbar #vClose {
   background: var(--yellow); color: var(--ink); font-weight: 700; width: auto; padding: 0 14px;
@@ -434,7 +434,7 @@ body.sidebar-open #backdrop { opacity: 1; pointer-events: auto; }
   position: absolute; z-index: 300;
   padding: 6px 10px; min-width: 140px;
   border: 2px solid var(--yellow); border-radius: 8px;
-  background: #fff; font-size: 14px; outline: none;
+  background: #fff; font-size: 16px; outline: none;
   box-shadow: var(--shadow);
 }
 
@@ -527,7 +527,7 @@ svg.ic { width: 20px; height: 20px; vertical-align: -0.18em; }
   background: rgba(255, 255, 255, .85); padding: 2px 7px; border-radius: 6px; color: var(--ink);
 }
 .tcard-name {
-  flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ink);
+  flex: 1; min-width: 0; font-size: 16px; font-weight: 600; color: var(--ink);
   border: 1px solid transparent; border-radius: 7px; padding: 3px 6px;
   background: transparent; outline: none;
   transition: background .15s, border .15s;
@@ -543,7 +543,7 @@ svg.ic { width: 20px; height: 20px; vertical-align: -0.18em; }
   width: 100%; padding: 10px 12px;
   border: 1px solid var(--line); border-radius: 10px;
   background: #fff; color: var(--ink);
-  font-size: 14px; line-height: 1.6; outline: none;
+  font-size: 16px; line-height: 1.6; outline: none;
   resize: vertical; font-family: inherit;
 }
 .wall-idea-input:focus { border-color: var(--yellow); box-shadow: 0 0 0 3px rgba(245, 197, 66, .22); }
@@ -609,7 +609,7 @@ svg.ic { width: 20px; height: 20px; vertical-align: -0.18em; }
 .wf-input {
   flex: 1; min-width: 0; padding: 10px 12px;
   border: 1px solid var(--line); border-radius: 10px;
-  background: #fff; color: var(--ink); font-size: 14px; outline: none;
+  background: #fff; color: var(--ink); font-size: 16px; outline: none;
 }
 .wf-input:focus { border-color: var(--yellow); box-shadow: 0 0 0 3px rgba(245,197,66,.22); }
 .wf-list { display: flex; flex-direction: column; gap: 10px; }
@@ -665,7 +665,7 @@ svg.ic { width: 20px; height: 20px; vertical-align: -0.18em; }
 .field select {
   width: 100%; padding: 10px 12px;
   border: 1px solid var(--line); border-radius: 10px;
-  background: var(--cream); color: var(--ink); font-size: 14px; outline: none;
+  background: var(--cream); color: var(--ink); font-size: 16px; outline: none;
   -webkit-appearance: none; appearance: none;
 }
 .field select:focus {
