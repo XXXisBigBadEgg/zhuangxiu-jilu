@@ -917,4 +917,8 @@
   /* ---------- 启动 ---------- */
   bindViewer();
   window.RenoDesign = { render: render, bind: bind, renderTabs: renderTabs };
+
+  /* 首屏兼容：app.js 先加载并在末尾 render()，那时本脚本尚未执行，
+     RenoDesign 还不存在，设计页会渲染成空白。此处加载完成后若当前正好在设计页，补一次重渲染。 */
+  if (App.isCurrent && App.isCurrent('design')) App.refresh();
 })();

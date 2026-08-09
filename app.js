@@ -8,6 +8,7 @@
   var CATEGORIES = [
     { id: 'design',     name: '设计',     icon: 'design' },
     { id: 'masonry',    name: '瓦工',     icon: 'masonry' },
+    { id: 'plumbing',   name: '水电工',   icon: 'plumbing' },
     { id: 'carpentry',  name: '木工',     icon: 'carpentry' },
     { id: 'painting',   name: '油工',     icon: 'painting' },
     { id: 'install',    name: '安装',     icon: 'install' },
@@ -29,6 +30,7 @@
   var ICONS = {
     design:     svgI('<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>'),
     masonry:    svgI('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v6M15 15v6"/>'),
+    plumbing:   svgI('<path d="M12 3c3 4 5 6.2 5 9a5 5 0 0 1-10 0c0-2.8 2-5 5-9Z"/><path d="M12 15v3M10 21h4"/>'),
     carpentry:  svgI('<path d="M14 3 21 10 18 13 11 6Z"/><path d="M12 7 4 15"/>'),
     painting:   svgI('<rect x="8" y="4" width="10" height="5" rx="1.5"/><path d="M10 9v7"/><path d="M7 16h6"/>'),
     install:    svgI('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'),
@@ -629,7 +631,8 @@
     toast: toast,
     esc: esc,
     fmt: fmt,
-    confirm: confirmDialog
+    confirm: confirmDialog,
+    isCurrent: function (cid) { return state.current === cid; }
   };
 
   /* ---------- 启动 ---------- */
