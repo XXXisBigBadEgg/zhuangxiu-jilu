@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <script>
+    /* 仅本地（file://）直接打开时跳转到手机预览页，方便桌面预览；
+       部署到线上（http/https）后直接显示应用本体 */
+    if (location.protocol === 'file:' && window.self === window.top) location.replace('手机预览.html');
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>装修记录 · 家的每一步</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 侧边栏（左页面，占屏幕 1/3） -->
+  <aside id="sidebar" aria-label="记录方向">
+    <div class="sidebar-head">
+      <div class="brand"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> 装修记录</div>
+      <small>家的每一步，都值得记录</small>
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+
+  <!-- 遮罩：点击关闭侧边栏 -->
+  <div id="backdrop"></div>
+
+  <!-- 主界面（右页面，占整个屏幕 100%） -->
+  <main id="main">
+    <header class="topbar">
+      <button id="menuBtn" aria-label="打开记录方向" title="记录方向">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="15" y2="18"/>
+        </svg>
+      </button>
+      <div class="topbar-title"><span class="icon" id="catIcon"></span><span id="catName"></span></div>
+      <div class="top-tabs" id="topTabs"></div>
+      <div class="topbar-total" id="topbarTotal"></div>
+    </header>
+
+    <section id="content"></section>
+  </main>
+
+  <!-- 全屏看图 + 标记编辑器 -->
+  <div id="viewer" hidden>
+    <div class="viewer-toolbar" id="vToolbar">
+      <span class="vname" id="vName">图纸</span>
+      <div class="vgroup">
+        <button data-v="zoomOut" title="缩小">−</button>
+        <button data-v="zoomIn" title="放大">＋</button>
+        <button data-v="reset" title="适应屏幕">⤢</button>
+      </div>
+      <div class="vdivider"></div>
+      <div class="vgroup">
+        <button data-tool="hand" class="active" title="手型：拖动平移，单击退出全屏"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></button>
+        <button data-tool="pen" title="画笔"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+        <button data-tool="line" title="直线"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M5 19 19 5"/></svg></button>
+        <button data-tool="arrow" title="箭头"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M5 19 19 5"/><path d="M9 5h10v10"/></svg></button>
+        <button data-tool="rect" title="方框"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><rect x="5" y="6" width="14" height="12" rx="1.5"/></svg></button>
+        <button data-tool="text" title="文字"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M6 5h12M12 5v14"/></svg></button>
+        <button data-tool="eraser" title="橡皮擦"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
+      </div>
+      <div class="vgroup colors" id="vColors"></div>
+      <div class="vgroup">
+        <select id="vWidth" title="线条粗细">
+          <option value="2">细</option>
+          <option value="4" selected>中</option>
+          <option value="8">粗</option>
+        </select>
+      </div>
+      <div class="vgroup">
+        <button data-v="undo" title="撤销上一步">↩</button>
+        <button data-v="clear" title="清空标记">清空</button>
+        <button id="vClose" data-v="close">✔ 保存退出</button>
+      </div>
+    </div>
+    <div class="viewer-stage" id="vStage">
+      <div class="viewer-box" id="vBox">
+        <img id="vImg" alt="" draggable="false">
+        <canvas id="vCanvas"></canvas>
+      </div>
+      <div class="viewer-hint" id="vHint">滚轮 / 双指缩放 · 拖动平移</div>
+    </div>
+  </div>
+
+  <!-- 轻提示 -->
+  <div id="toast" role="status"></div>
+
+  <script src="app.js"></script>
+  <script src="design.js"></script>
+</body>
+</html>
