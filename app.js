@@ -263,15 +263,18 @@
     );
   }
   function workItemHTML(it, cid) {
-    var sub = (it.sub || []).length
-      ? '<div class="wf-sub">' + it.sub.map(function (s) { return workItemHTML(s, cid); }).join('') + '</div>'
+    var hasSub = (it.sub || []).length > 0;
+    var sub = hasSub
+      ? '<div class="wf-sub' + (it.collapsed ? ' hidden' : '') + '">' + it.sub.map(function (s) { return workItemHTML(s, cid); }).join('') + '</div>'
       : '';
     return '<div class="wf-item" data-id="' + it.id + '">' +
       '<div class="wf-row' + (it.done ? ' done' : '') + '">' +
         '<button class="wf-check' + (it.done ? ' checked' : '') + '" data-wf="check" title="标记完成">' + (it.done ? '✓' : '') + '</button>' +
         '<span class="wf-text">' + esc(it.text) + '</span>' +
         '<span class="wf-tools">' +
+          (hasSub ? '<button class="icon-btn wf-fold" data-wf="fold" title="' + (it.collapsed ? '展开子流程' : '收起子流程') + '">' + (it.collapsed ? '▸' : '▾') + '</button>' : '') +
           '<button class="btn btn-sm wf-link" data-wf="link" title="添加衔接流程">＋ 衔接</button>' +
+          '<button class="icon-btn" data-wf="edit" title="编辑流程">' + ICONS.pencil + '</button>' +
           '<button class="icon-btn danger" data-wf="del" title="删除">' + ICONS.trash + '</button>' +
         '</span>' +
       '</div>' +
@@ -279,6 +282,11 @@
         '<input class="wf-input" data-inline-input maxlength="50" placeholder="填写衔接的下一步…" spellcheck="false">' +
         '<button class="btn btn-sm btn-primary" data-inline-ok>添加</button>' +
         '<button class="btn btn-sm" data-inline-cancel>取消</button>' +
+      '</div>' +
+      '<div class="wf-inline hidden" data-edit="' + it.id + '">' +
+        '<input class="wf-input" data-edit-input maxlength="50" value="' + esc(it.text) + '" spellcheck="false">' +
+        '<button class="btn btn-sm btn-primary" data-edit-ok>保存</button>' +
+        '<button class="btn btn-sm" data-edit-cancel>取消</button>' +
       '</div>' +
       sub +
     '</div>';
@@ -322,6 +330,9 @@
         if (btn.dataset.wf === 'check') {
           node.done = !node.done;
           saveWorkflow(); render();
+        } else if (btn.dataset.wf === 'fold') {
+          node.collapsed = !node.collapsed;
+          saveWorkflow(); render();
         } else if (btn.dataset.wf === 'del') {
           confirmDialog('删除这个流程吗？它下面的衔接流程会保留并顶上来。', {
             title: '删除流程', icon: ICONS.trash
@@ -331,8 +342,11 @@
             saveWorkflow(); render();
           });
         } else if (btn.dataset.wf === 'link') {
-          var wrap = item.querySelector('.wf-inline');
+          var wrap = item.querySelector('[data-inline="' + item.dataset.id + '"]');
           if (wrap) wrap.classList.toggle('hidden');
+        } else if (btn.dataset.wf === 'edit') {
+          var ew = item.querySelector('[data-edit="' + item.dataset.id + '"]');
+          if (ew) ew.classList.toggle('hidden');
         }
       });
     });
@@ -354,6 +368,25 @@
       ok.addEventListener('click', doAddSub);
       cancel.addEventListener('click', function () { wrap.classList.add('hidden'); });
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doAddSub(); });
+    });
+
+    /* 编辑流程内容 */
+    document.querySelectorAll('[data-edit]').forEach(function (wrap) {
+      var id = wrap.dataset.edit;
+      var ok = wrap.querySelector('[data-edit-ok]');
+      var cancel = wrap.querySelector('[data-edit-cancel]');
+      var inp = wrap.querySelector('[data-edit-input]');
+      var doSave = function () {
+        var text = inp.value.trim();
+        if (!text) { toast('流程内容不能为空'); return; }
+        var node = findWorkNode(wf[cid], id);
+        if (!node) return;
+        node.text = text.slice(0, 50);
+        saveWorkflow(); render();
+      };
+      ok.addEventListener('click', doSave);
+      cancel.addEventListener('click', function () { wrap.classList.add('hidden'); });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSave(); });
     });
   }
 
@@ -574,6 +607,85 @@
     toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
   }
 
+  /* ---------- 数据备份：导出 / 导入（浏览器与桌面版之间迁移数据） ---------- */
+  var BACKUP_KEYS = [STORAGE_KEY, WF_KEY, 'zhuangxiu-design-v1'];
+  var backupModal = null;
+
+  function openBackup() {
+    if (backupModal) { backupModal.classList.add('open'); return; }
+    backupModal = document.createElement('div');
+    backupModal.className = 'cf-modal';
+    backupModal.innerHTML =
+      '<div class="cf-box backup-box">' +
+        '<div class="cf-head">' +
+          '<span class="cf-title">' + ICONS.lightbulb + ' 数据备份</span>' +
+        '</div>' +
+        '<div class="cf-msg">把当前的全部数据（账单、工作台流程、灵感墙）导出成文件，或从文件导入。换手机、装桌面版时用它搬数据。</div>' +
+        '<div class="backup-actions">' +
+          '<button id="bkExport" class="btn btn-primary">导出数据文件</button>' +
+          '<label class="btn backup-import">导入数据文件<input type="file" id="bkImport" accept=".json,application/json" hidden></label>' +
+        '</div>' +
+        '<div class="backup-hint">导出的文件请保存好；在另一个版本（如桌面版）里点「导入数据文件」即可恢复。</div>' +
+      '</div>';
+    document.body.appendChild(backupModal);
+    backupModal.addEventListener('click', function (e) {
+      if (e.target === backupModal) closeBackup();
+    });
+    document.addEventListener('keydown', onBkKey);
+    function onBkKey(e) { if (e.key === 'Escape') closeBackup(); }
+    $('#bkExport').addEventListener('click', exportData);
+    var file = $('#bkImport');
+    file.addEventListener('change', function () {
+      var f = file.files[0];
+      file.value = '';
+      if (f) importData(f);
+    });
+    requestAnimationFrame(function () { backupModal.classList.add('open'); });
+  }
+  function closeBackup() {
+    if (!backupModal) return;
+    backupModal.classList.remove('open');
+    setTimeout(function () { if (backupModal) { backupModal.remove(); backupModal = null; } }, 180);
+  }
+  function exportData() {
+    var payload = {};
+    BACKUP_KEYS.forEach(function (k) {
+      var raw = localStorage.getItem(k);
+      if (raw) { try { payload[k] = JSON.parse(raw); } catch (e) {} }
+    });
+    var blob = new Blob(
+      [JSON.stringify({ app: '兵子装修台', version: 1, exportedAt: new Date().toISOString(), data: payload }, null, 2)],
+      { type: 'application/json' }
+    );
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '兵子装修台-数据备份-' + todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+    toast('已导出备份文件 ✓');
+  }
+  function importData(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var obj = JSON.parse(reader.result);
+        var payload = (obj && obj.data && typeof obj.data === 'object') ? obj.data : null;
+        if (!payload) { toast('文件格式不对，不是本应用导出的备份'); return; }
+        var cnt = 0;
+        BACKUP_KEYS.forEach(function (k) {
+          if (payload[k] !== undefined) {
+            localStorage.setItem(k, JSON.stringify(payload[k]));
+            cnt += 1;
+          }
+        });
+        toast('导入成功，共恢复 ' + cnt + ' 项数据，正在刷新…');
+        setTimeout(function () { location.reload(); }, 600);
+      } catch (e) { toast('导入失败：文件无法解析'); }
+    };
+    reader.readAsText(file);
+  }
+
   /* ---------- 统一鹅黄确认弹窗（替换原生 confirm） ---------- */
   function confirmDialog(message, opts) {
     opts = opts || {};
@@ -624,6 +736,10 @@
     closeSidebar();                     // 主界面占整个界面 100%
     render();
   });
+
+  /* 数据备份（侧边栏底部） */
+  var backupBtn = $('#backupBtn');
+  if (backupBtn) backupBtn.addEventListener('click', function () { openBackup(); });
 
   /* ---------- 暴露给设计板块（design.js）共用 ---------- */
   window.RenoApp = {
